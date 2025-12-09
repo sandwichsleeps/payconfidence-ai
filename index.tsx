@@ -465,8 +465,74 @@ const GlobalStyle = () => (
       border-left: 4px solid #007bff;
       font-size: 14px;
     }
+
+    .review-box {
+      white-space: pre-wrap;
+      background: #fff7e6;
+      padding: 18px;
+      border-radius: 10px;
+      border-left: 4px solid #ff9800;
+      font-size: 14px;
+      margin-top: 20px;
+    }
   `}</style>
 );
+
+/* -------------------------------------------------------------------
+   AI Review Function
+---------------------------------------------------------------------*/
+
+async function getAIReview(text: string): Promise<string> {
+  try {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return "Error: Gemini API key is missing. Please configure VITE_GEMINI_API_KEY in your environment variables.";
+    }
+
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text:
+`You are a senior payroll compliance specialist.
+
+Please review the following EA-based payroll calculation explanation.
+
+Provide:
+1) A concise professional summary
+2) Any risks, logic gaps, or potential EA compliance issues
+3) Suggestions to improve clarity, controls, and governance
+4) Keep the tone structured and board-ready.
+
+Explanation to review:
+---------------------
+${text}
+---------------------`
+                }
+              ]
+            }
+          ]
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    return (
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "No response received from Gemini API."
+    );
+  } catch (err) {
+    return "AI Review Error: " + String(err);
+  }
+}
 
 /* -------------------------------------------------------------------
    App Component
@@ -478,9 +544,18 @@ function App() {
   const [end, setEnd] = useState("");
   const [breakMinutes, setBreakMinutes] = useState("0");
   const [result, setResult] = useState<CalculationResult | null>(null);
+  const [review, setReview] = useState<string>("");
 
   const handleCalculate = () => {
+    setReview("");
     setResult(applyRules(date, start, end, breakMinutes));
+  };
+
+  const handleAIReview = async () => {
+    if (!result) return;
+    setReview("AI is reviewing this interpretation...");
+    const output = await getAIReview(result.explanation);
+    setReview(output);
   };
 
   return (
@@ -594,6 +669,18 @@ function App() {
 
           <h3 style={{ marginTop: "24px" }}>Interpretation</h3>
           <div className="explanation-box">{result.explanation}</div>
+
+          <button onClick={handleAIReview} style={{ marginTop: "16px" }}>
+            AI Review
+          </button>
+
+          {review && (
+            <div className="review-box">
+              <strong>AI Review:</strong>
+              {"\n\n"}
+              {review}
+            </div>
+          )}
         </div>
       )}
     </div>
