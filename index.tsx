@@ -479,61 +479,27 @@ const GlobalStyle = () => (
 );
 
 /* -------------------------------------------------------------------
-   AI Review Function
+   AI Review Function — Call internal API
 ---------------------------------------------------------------------*/
 
 async function getAIReview(text: string): Promise<string> {
   try {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
 
-    if (!apiKey) {
-      return "Error: Gemini API key is missing. Please configure VITE_GEMINI_API_KEY in your environment variables.";
+    if (!res.ok) {
+      return "Error: Failed to call internal API. Status: " + res.status;
     }
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text:
-`You are a senior payroll compliance specialist.
-
-Please review the following EA-based payroll calculation explanation.
-
-Provide:
-1) A concise professional summary
-2) Any risks, logic gaps, or potential EA compliance issues
-3) Suggestions to improve clarity, controls, and governance
-4) Keep the tone structured and board-ready.
-
-Explanation to review:
----------------------
-${text}
----------------------`
-                }
-              ]
-            }
-          ]
-        })
-      }
-    );
-
-    const data = await response.json();
-
-    return (
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No response received from Gemini API."
-    );
+    const data = await res.json();
+    return data.review || "No review text returned.";
   } catch (err) {
     return "AI Review Error: " + String(err);
   }
 }
-
 /* -------------------------------------------------------------------
    App Component
 ---------------------------------------------------------------------*/
@@ -696,3 +662,5 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <App />
   </React.StrictMode>
 );
+
+
